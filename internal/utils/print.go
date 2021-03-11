@@ -1,14 +1,14 @@
-package print
+package utils
 
 import (
 	"bufio"
 	"bytes"
 	"fmt"
-	"log"
 	"os"
 	"time"
 
 	"github.com/CyrilPeponnet/polkaTax/internal/polkadot"
+	"github.com/buger/goterm"
 	"github.com/olekukonko/tablewriter"
 )
 
@@ -25,23 +25,29 @@ func outputcsv(rewards polkadot.Rewards, csv string) {
 
 	f, err := os.Create(csv)
 	if err != nil {
-		log.Fatalf("unable to create file %s: %s", csv, err)
+		fmt.Println(goterm.Color(fmt.Sprintf("unable to create file %s: %s", csv, err), goterm.RED))
+		os.Exit(1)
 	}
-	defer f.Close()
+
+	defer f.Close() //nolint
 
 	w := bufio.NewWriter(f)
 
 	_, err = fmt.Fprintln(w, "REWARD DATE,AMOUNT,USD QUOTE DATE,USD QUOTE,USD VALUE")
 	if err != nil {
-		log.Fatalf("unable to write to %s: %s", csv, err)
+		fmt.Println(goterm.Color(fmt.Sprintf("unable to write to %s: %s", csv, err), goterm.RED))
+		os.Exit(1)
 	}
+
 	for _, r := range rewards {
-		_, err = fmt.Printf("%s,%f,%s,%f,%f", r.RewardTimeStamp.Format(time.RFC3339), r.Value, r.USDQuoteTimeStamp.Format(time.RFC3339), r.USDQuote, r.Value*r.USDQuote)
+		_, err = fmt.Fprintf(w, "%s,%f,%s,%f,%f\n", r.RewardTimeStamp.Format(time.RFC3339), r.Value, r.USDQuoteTimeStamp.Format(time.RFC3339), r.USDQuote, r.Value*r.USDQuote)
 		if err != nil {
-			log.Fatalf("unable to write to %s: %s", csv, err)
+			fmt.Println(goterm.Color(fmt.Sprintf("unable to write to %s: %s", csv, err), goterm.RED))
+			os.Exit(1)
 		}
 	}
-	w.Flush()
+
+	w.Flush() //nolint
 }
 
 func outputTable(rewards polkadot.Rewards) {
@@ -73,5 +79,5 @@ func outputTable(rewards polkadot.Rewards) {
 	table.Render()
 
 	fmt.Println("\n" + out.String())
-	fmt.Println("Total USD for period: ", total)
+	fmt.Println("Total USD for period: ", goterm.Bold(fmt.Sprintf("%f", total)))
 }

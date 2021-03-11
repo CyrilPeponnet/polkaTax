@@ -31,6 +31,7 @@ type coinMarketHistoricalData struct {
 	} `json:"data"`
 }
 
+// USDQuote represents the USD quotation for a given time
 type USDQuote struct {
 	TimeStamp time.Time
 	Value     float64
@@ -51,6 +52,7 @@ func (p HistoricalData) Swap(i, j int) {
 	p[i], p[j] = p[j], p[i]
 }
 
+// GetHistoricalData will retrieve historical data for a given currency and time window
 func GetHistoricalData(network string, from time.Time, to time.Time, interval time.Duration) (HistoricalData, error) {
 
 	chd := &coinMarketHistoricalData{}
@@ -78,8 +80,9 @@ func GetHistoricalData(network string, from time.Time, to time.Time, interval ti
 	q.Add("format", "chart_crypto_details")
 	q.Add("id", code)
 	q.Add("interval", fmt.Sprintf("%dh", int(interval.Hours())))
-	q.Add("time_end", fmt.Sprintf("%d", to.Unix()))
 	q.Add("time_start", fmt.Sprintf("%d", from.Unix()))
+	q.Add("time_end", fmt.Sprintf("%d", to.Unix()))
+
 	url.RawQuery = q.Encode()
 
 	req, err := http.NewRequest(http.MethodGet, url.String(), nil)
@@ -105,7 +108,11 @@ func GetHistoricalData(network string, from time.Time, to time.Time, interval ti
 	}
 
 	if len(chd.MapQuotes) == 0 {
-		return hd, fmt.Errorf("unable to get historical data: %s", chd.Status.ErrorMessage)
+		// workaround:
+		if chd.Status.ErrorMessage == `"time_start" must be older than "time_end".` {
+			return hd, fmt.Errorf("unable to get historical data from %s because of error %s", url.String(), fmt.Sprintf("unable to find quote in the %s to %s range", from, to))
+		}
+		return hd, fmt.Errorf("unable to get historical data from %s because of error %s", url.String(), chd.Status.ErrorMessage)
 	}
 
 	// convert to HistoricalData

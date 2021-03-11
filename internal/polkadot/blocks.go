@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-type Block struct {
+type block struct {
 	Errors []interface{} `json:"errors"`
 	Data   struct {
 		ID         int `json:"id"`
@@ -52,7 +52,7 @@ func BlockTime(burl string, network string, id int) (time.Time, error) {
 		return time.Now(), fmt.Errorf("unable to read body: %w", err)
 	}
 
-	b := Block{}
+	b := block{}
 	err = json.Unmarshal(body, &b)
 
 	if err != nil {

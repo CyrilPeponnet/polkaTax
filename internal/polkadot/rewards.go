@@ -9,9 +9,10 @@ import (
 	"time"
 
 	"github.com/CyrilPeponnet/polkaTax/internal/configuration"
+	"github.com/buger/goterm"
 )
 
-// Rewards preseents the reward for a given time
+// Reward preseents the reward for a given time
 type Reward struct {
 	RewardTimeStamp, USDQuoteTimeStamp time.Time
 	BlockID                            int
@@ -52,9 +53,9 @@ type Events struct {
 	} `json:"data"`
 }
 
-// search_index constants that represents the events
-const search_index = "39"
-const page_size = "200"
+// searchIndex constants that represents the events
+const searchIndex = "39"
+const pageSize = "200"
 const evendID = "Reward"
 
 // This is to convert back to dot
@@ -62,7 +63,10 @@ const dotDivider = 10000000000
 const ksmDivider = 1000000000000
 
 // RewardsList will retrieve events related to stacking
-func RewardsList(cfg *configuration.Configuration, rewards chan<- *Reward) error {
+func RewardsList(cfg *configuration.Configuration) (Rewards, error) {
+
+	var rewards Rewards
+	start := time.Now()
 
 	client := &http.Client{
 		Timeout: 120 * time.Second,
@@ -81,17 +85,21 @@ func RewardsList(cfg *configuration.Configuration, rewards chan<- *Reward) error
 	// Build the url
 	url, err := url.Parse(cfg.BaseURL)
 	if err != nil {
-		return err
+		return rewards, err
 	}
 	url.Path = fmt.Sprintf("api/v1/%v/event", cfg.Network)
 
 	q := url.Query()
 	q.Set("filter[address]", cfg.Account)
-	q.Set("filter[search_index]", search_index)
-	q.Set("page[size]", page_size)
+	q.Set("filter[search_index]", searchIndex)
+	q.Set("page[size]", pageSize)
 
 	// Loop until we are done (no results) or if time windows is exhautsted
+	found := false
+
 	for {
+
+		fmt.Printf("\r* %s rewards retrieved", goterm.Bold(fmt.Sprintf("%d", len(rewards))))
 
 		page++
 		q.Set("page[number]", fmt.Sprintf("%d", page))
@@ -99,33 +107,38 @@ func RewardsList(cfg *configuration.Configuration, rewards chan<- *Reward) error
 
 		req, err := http.NewRequest(http.MethodGet, url.String(), nil)
 		if err != nil {
-			return fmt.Errorf("unable to build request: %w", err)
+			return rewards, fmt.Errorf("unable to build request: %w", err)
 		}
 
 		resp, err := client.Do(req)
 		if err != nil {
-			return fmt.Errorf("unable to send request: %w", err)
+			return rewards, fmt.Errorf("unable to send request: %w", err)
 		}
 
 		body, err := ioutil.ReadAll(resp.Body)
 		defer resp.Body.Close() //nolint
 		if err != nil {
-			return fmt.Errorf("unable to read body: %w", err)
+			return rewards, fmt.Errorf("unable to read body: %w", err)
 		}
 
 		ev := Events{}
 		err = json.Unmarshal(body, &ev)
 
 		if err != nil {
-			return fmt.Errorf("uanble to unmarshal data %s", err)
+			return rewards, fmt.Errorf("uanble to unmarshal data %s", err)
 		}
 
 		// no more events means we are done
 		if len(ev.Data) == 0 {
-			return nil
+			if !found {
+				return rewards, fmt.Errorf("No rewards founds for %s", cfg.Account)
+			}
+			fmt.Println(goterm.Color(fmt.Sprintf("\n took %s", time.Since(start)), goterm.GREEN))
+			return rewards, nil
 		}
+		found = true
 
-		// Retrive the date time from the block
+		// Retrieve the date time from the block
 		for _, e := range ev.Data {
 			// Keep only reward events
 			if e.Attributes.EvendID != evendID {
@@ -136,12 +149,11 @@ func RewardsList(cfg *configuration.Configuration, rewards chan<- *Reward) error
 			for _, a := range e.Attributes.Attributes {
 				if a.Type == "Balance" {
 					if balance, ok = a.Value.(float64); !ok {
-						return fmt.Errorf("error while converting balance to float64: %T", a.Value)
+						return rewards, fmt.Errorf("error while converting balance to float64: %T", a.Value)
 					}
 				}
 			}
-
-			rewards <- &Reward{BlockID: e.Attributes.BlockID, Value: float64(balance / float64(divider))}
+			rewards = append(rewards, &Reward{BlockID: e.Attributes.BlockID, Value: balance / float64(divider)})
 		}
 
 	}

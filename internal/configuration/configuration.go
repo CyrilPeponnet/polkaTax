@@ -2,9 +2,11 @@
 package configuration
 
 import (
-	"log"
+	"fmt"
+	"os"
 	"time"
 
+	"github.com/buger/goterm"
 	"go.aporeto.io/addedeffect/lombric"
 )
 
@@ -13,7 +15,7 @@ type Configuration struct {
 	Account    string        `mapstructure:"account" desc:"The account address to use" required:"true"`
 	Network    string        `mapstructure:"network" desc:"The network to use" default:"polkadot" allowed:"polkadot,kusama"`
 	Era        time.Duration `mapstructure:"era" desc:"Optional set the era to compute historical quote. default is 6h for Kusama and 24h for Polkadot"`
-	BaseURL    string        `mapstructure:"url" desc:"The KSM api url to use" default:"https://explorer-32.polkascan.io"`
+	BaseURL    string        `mapstructure:"url" desc:"The polkascan api url to use" default:"https://explorer-32.polkascan.io"`
 	Concurency int           `mapstructure:"concurrent" desc:"The number of concurent jobs to run" default:"100"`
 	From       string        `mapstructure:"from" desc:"Optional starting date"`
 	To         string        `mapstructure:"to" desc:"Optional ending date"`
@@ -34,19 +36,24 @@ func NewConfiguration() *Configuration {
 
 	if c.From != "" {
 		if c.Start, err = time.Parse(time.RFC3339, c.From); err != nil {
-			log.Fatalf("unable to parse %s as date", c.From)
+			fmt.Println(goterm.Color(fmt.Sprintf("unable to parse %s as date", c.From), goterm.RED))
+			os.Exit(1)
 		}
 	}
 
 	if c.To != "" {
 		if c.End, err = time.Parse(time.RFC3339, c.To); err != nil {
-			log.Fatalf("unable to parse %s as date", c.To)
+			fmt.Println(goterm.Color(fmt.Sprintf("unable to parse %s as date", c.To), goterm.RED))
+			os.Exit(1)
 		}
+	} else if !c.Start.IsZero() {
+		c.End = time.Now()
 	}
 
 	if !c.Start.IsZero() && !c.End.IsZero() {
 		if c.Start.After(c.End) {
-			log.Fatalf("from cannot be greater than to: %s > %s", c.Start, c.End)
+			fmt.Println(goterm.Color(fmt.Sprintf("from cannot be greater than to: %s > %s", c.Start, c.End), goterm.RED))
+			os.Exit(1)
 		}
 	}
 
@@ -56,6 +63,12 @@ func NewConfiguration() *Configuration {
 		} else {
 			c.Era = 6 * time.Hour
 		}
+	}
+
+	if c.Start.IsZero() {
+		fmt.Printf("Computing data for %s on %s network...\n", goterm.Bold(c.Account), goterm.Bold(c.Network))
+	} else {
+		fmt.Printf("Computing data for %s on %s network between %s and %s...\n", goterm.Bold(c.Account), goterm.Bold(c.Network), goterm.Bold(c.Start.Format(time.RFC3339)), goterm.Bold(c.End.Format(time.RFC3339)))
 	}
 
 	return c
