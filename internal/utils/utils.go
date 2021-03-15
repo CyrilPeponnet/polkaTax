@@ -14,6 +14,10 @@ func FindClosestQuoteIndex(t time.Time, data coinmarket.HistoricalData) (int, er
 
 	lookup = func(lowerBound, upperBound int) (int, error) {
 
+		if upperBound == 0 {
+			return upperBound, nil
+		}
+
 		if upperBound >= lowerBound {
 
 			mid := lowerBound + ((upperBound - lowerBound) / 2)
