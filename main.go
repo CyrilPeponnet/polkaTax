@@ -19,7 +19,12 @@ func main() {
 	cfg := configuration.NewConfiguration()
 
 	// output
-	utils.FormattedOutput(quoteRewards(retrieveRewards(cfg), cfg), cfg.CSV)
+	rewards, norFoundRewards := quoteRewards(retrieveRewards(cfg), cfg)
+	utils.FormattedOutput(rewards, cfg.CSV)
+
+	// no csv option available for not found rewards
+	fmt.Println(goterm.Color(fmt.Sprintf("\nThe following rewards were not quoted:"), goterm.RED))
+	utils.FormattedOutputForNotFoundRewards(norFoundRewards)
 
 }
 
@@ -89,7 +94,7 @@ func retrieveRewards(cfg *configuration.Configuration) (rewards polkadot.Rewards
 	return rewards
 }
 
-func quoteRewards(unquotedRewards polkadot.Rewards, cfg *configuration.Configuration) (quotedRewards polkadot.Rewards) {
+func quoteRewards(unquotedRewards polkadot.Rewards, cfg *configuration.Configuration) (quotedRewards polkadot.Rewards, notFoundRewards polkadot.Rewards) {
 
 	// Bucketize rewards per contiguous era
 	// Get USD quote for each bucket
@@ -100,19 +105,26 @@ func quoteRewards(unquotedRewards polkadot.Rewards, cfg *configuration.Configura
 
 		fmt.Printf("\r* Getting historical data for bucket %s/%s...", goterm.Bold(fmt.Sprintf("%d", i)), goterm.Bold(fmt.Sprintf("%d", len(buckets)-1)))
 
+		foundHistoricalData := true
 		data, err := coinmarket.GetHistoricalData(cfg.Network, bucket[0].RewardTimeStamp.Add(-24*time.Hour), bucket[len(bucket)-1].RewardTimeStamp.Add(24*time.Hour), cfg.Era)
 		if err != nil {
 			fmt.Println(goterm.Color(fmt.Sprintf("unable to get historical data: %s", err), goterm.RED))
-			os.Exit(1)
+			foundHistoricalData = false
 		}
 
 		// For each reward try to get the closest quote
 		for ridx := range bucket {
 
+			if !foundHistoricalData {
+				notFoundRewards = append(notFoundRewards, bucket[ridx])
+				continue
+			}
+
 			i, err := utils.FindClosestQuoteIndex(bucket[ridx].RewardTimeStamp, data)
 			if err != nil {
 				fmt.Println(goterm.Color(fmt.Sprintf("unable to get quote for %s: %s", bucket[ridx].RewardTimeStamp, err), goterm.RED))
-				os.Exit(1)
+				notFoundRewards = append(notFoundRewards, bucket[ridx])
+				continue
 			}
 
 			bucket[ridx].USDQuoteTimeStamp = data[i].TimeStamp
@@ -124,5 +136,5 @@ func quoteRewards(unquotedRewards polkadot.Rewards, cfg *configuration.Configura
 
 	fmt.Println(goterm.Color(fmt.Sprintf("took %s to process %d rewards", time.Since(start), len(quotedRewards)), goterm.GREEN))
 
-	return quotedRewards
+	return quotedRewards, notFoundRewards
 }
