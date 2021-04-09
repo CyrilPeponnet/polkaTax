@@ -8,9 +8,9 @@ Usage of ./polkaTax:
       --concurrent int   The number of concurent jobs to run (default 100)
       --csv string       To save the results to a csv file
       --era duration     Optional set the era to compute historical quote. default is 6h for Kusama and 24h for Polkadot
-      --from string      Optional starting date
+      --from string      Optional starting date, this should be in the format 2020-01-01T00:00:00+00:00
       --network string   The network to use [allowed: polkadot,kusama] (default "polkadot")
-      --to string        Optional ending date
+      --to string        Optional ending date, this should be in the format 2020-01-01T00:00:00+00:00
       --url string       The polkascan api url to use (default "https://explorer-32.polkascan.io")
 ```
 
