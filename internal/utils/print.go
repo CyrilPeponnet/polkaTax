@@ -56,9 +56,12 @@ func outputTable(rewards polkadot.Rewards) {
 
 	rows := [][]string{}
 	total := 0.0
+	totalRewards := 0.0
+
 	for _, r := range rewards {
 		rows = append(rows, []string{r.RewardTimeStamp.Format(time.RFC3339), fmt.Sprintf("%f", r.Value), r.USDQuoteTimeStamp.Format(time.RFC3339), fmt.Sprintf("%f", r.USDQuote), fmt.Sprintf("%f", r.Value*r.USDQuote)})
 		total = total + r.Value*r.USDQuote
+		totalRewards = totalRewards + r.Value
 	}
 
 	out := &bytes.Buffer{}
@@ -80,4 +83,7 @@ func outputTable(rewards polkadot.Rewards) {
 
 	fmt.Println("\n" + out.String())
 	fmt.Println("Total USD for period: ", goterm.Bold(fmt.Sprintf("%f", total)))
+	fmt.Println("Total Rewards for period: ", goterm.Bold(fmt.Sprintf("%f", totalRewards)))
+	fmt.Printf("Total Rewards USD value as of %s: %s \n", goterm.Bold(fmt.Sprintf("%s", rewards[len(rewards)-1].RewardTimeStamp)), goterm.Bold(fmt.Sprintf("%f", totalRewards*rewards[len(rewards)-1].USDQuote)))
+
 }

@@ -12,14 +12,12 @@ import (
 
 // Configuration hold the service configuration.
 type Configuration struct {
-	Account    string        `mapstructure:"account" desc:"The account address to use" required:"true"`
-	Network    string        `mapstructure:"network" desc:"The network to use" default:"polkadot" allowed:"polkadot,kusama"`
-	Era        time.Duration `mapstructure:"era" desc:"Optional set the era to compute historical quote. default is 6h for Kusama and 24h for Polkadot"`
-	BaseURL    string        `mapstructure:"url" desc:"The polkascan api url to use" default:"https://explorer-32.polkascan.io"`
-	Concurency int           `mapstructure:"concurrent" desc:"The number of concurent jobs to run" default:"100"`
-	From       string        `mapstructure:"from" desc:"Optional starting date"`
-	To         string        `mapstructure:"to" desc:"Optional ending date"`
-	CSV        string        `mapstructure:"csv" desc:"To save the results to a csv file"`
+	Account    string `mapstructure:"account" desc:"The account address to use" required:"true"`
+	Network    string `mapstructure:"network" desc:"The network to use" default:"Polkadot" allowed:"Polkadot,Kusama"`
+	BaseURL    string `mapstructure:"url" desc:"The scanner api url to use" default:"https://api.dotscanner.com"`
+	From       string `mapstructure:"from" desc:"Optional starting date"`
+	To         string `mapstructure:"to" desc:"Optional ending date"`
+	CSV        string `mapstructure:"csv" desc:"To save the results to a csv file"`
 	Start, End time.Time
 }
 
@@ -54,14 +52,6 @@ func NewConfiguration() *Configuration {
 		if c.Start.After(c.End) {
 			fmt.Println(goterm.Color(fmt.Sprintf("from cannot be greater than to: %s > %s", c.Start, c.End), goterm.RED))
 			os.Exit(1)
-		}
-	}
-
-	if c.Era == 0*time.Second {
-		if c.Network == "polkadot" {
-			c.Era = 24 * time.Hour
-		} else {
-			c.Era = 6 * time.Hour
 		}
 	}
 

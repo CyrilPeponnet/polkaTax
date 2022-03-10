@@ -13,22 +13,37 @@ import (
 const (
 	dotCode       = "6636"
 	ksmCode       = "5034"
-	coinmarketURL = "https://web-api.coinmarketcap.com/v1.1/cryptocurrency/quotes/historical"
+	coinmarketURL = "https://api.coinmarketcap.com/data-api/v3/cryptocurrency/historical"
 )
 
-// coinMarketHistoricalData is the data structure returned
 type coinMarketHistoricalData struct {
-	Status struct {
-		Timestamp    time.Time   `json:"timestamp"`
-		ErrorCode    int         `json:"error_code"`
-		ErrorMessage string      `json:"error_message"`
-		Elapsed      int         `json:"elapsed"`
-		CreditCount  int         `json:"credit_count"`
-		Notice       interface{} `json:"notice"`
-	} `json:"status"`
-	MapQuotes map[time.Time]struct {
-		USD []float64 `json:"USD"`
+	Data struct {
+		ID     int    `json:"id"`
+		Name   string `json:"name"`
+		Symbol string `json:"symbol"`
+		Quotes []struct {
+			TimeOpen  time.Time `json:"timeOpen"`
+			TimeClose time.Time `json:"timeClose"`
+			TimeHigh  time.Time `json:"timeHigh"`
+			TimeLow   time.Time `json:"timeLow"`
+			Quote     struct {
+				Open      float64   `json:"open"`
+				High      float64   `json:"high"`
+				Low       float64   `json:"low"`
+				Close     float64   `json:"close"`
+				Volume    float64   `json:"volume"`
+				MarketCap float64   `json:"marketCap"`
+				Timestamp time.Time `json:"timestamp"`
+			} `json:"quote"`
+		} `json:"quotes"`
 	} `json:"data"`
+	Status struct {
+		Timestamp    time.Time `json:"timestamp"`
+		ErrorCode    string    `json:"error_code"`
+		ErrorMessage string    `json:"error_message"`
+		Elapsed      string    `json:"elapsed"`
+		CreditCount  int       `json:"credit_count"`
+	} `json:"status"`
 }
 
 // USDQuote represents the USD quotation for a given time
@@ -53,14 +68,14 @@ func (p HistoricalData) Swap(i, j int) {
 }
 
 // GetHistoricalData will retrieve historical data for a given currency and time window
-func GetHistoricalData(network string, from time.Time, to time.Time, interval time.Duration) (HistoricalData, error) {
+func GetHistoricalData(network string, from time.Time, to time.Time) (HistoricalData, error) {
 
 	chd := &coinMarketHistoricalData{}
 	hd := HistoricalData{}
 
 	// Set proper code
 	code := dotCode
-	if network == "kusama" {
+	if network == "Kusama" {
 		code = ksmCode
 	}
 
@@ -76,12 +91,10 @@ func GetHistoricalData(network string, from time.Time, to time.Time, interval ti
 		panic(err)
 	}
 	q := url.Query()
-	q.Add("convert", "USD,BTC")
-	q.Add("format", "chart_crypto_details")
 	q.Add("id", code)
-	q.Add("interval", fmt.Sprintf("%dh", int(interval.Hours())))
-	q.Add("time_start", fmt.Sprintf("%d", from.Unix()))
-	q.Add("time_end", fmt.Sprintf("%d", to.Unix()))
+	q.Add("convertId", "2781")
+	q.Add("timeStart", fmt.Sprintf("%d", from.Unix()))
+	q.Add("timeEnd", fmt.Sprintf("%d", to.Unix()))
 
 	url.RawQuery = q.Encode()
 
@@ -104,20 +117,25 @@ func GetHistoricalData(network string, from time.Time, to time.Time, interval ti
 	err = json.Unmarshal(body, &chd)
 
 	if err != nil {
+		fmt.Println(url.String())
+		fmt.Println(string(body))
 		return hd, fmt.Errorf("unable to unmarshal data %s", err)
 	}
 
-	if len(chd.MapQuotes) == 0 {
+	if len(chd.Data.Quotes) == 0 {
 		// workaround:
 		if chd.Status.ErrorMessage == `"time_start" must be older than "time_end".` {
 			return hd, fmt.Errorf("unable to get historical data from %s because of error %s", url.String(), fmt.Sprintf("unable to find quote in the %s to %s range", from, to))
 		}
-		return hd, fmt.Errorf("unable to get historical data from %s because of error %s", url.String(), chd.Status.ErrorMessage)
+		return hd, nil
 	}
 
 	// convert to HistoricalData
-	for ts, values := range chd.MapQuotes {
-		hd = append(hd, USDQuote{TimeStamp: ts.UTC(), Value: values.USD[0]})
+	for _, quote := range chd.Data.Quotes {
+		hd = append(hd, USDQuote{TimeStamp: quote.TimeOpen.UTC(), Value: quote.Quote.Open})
+		hd = append(hd, USDQuote{TimeStamp: quote.TimeClose.UTC(), Value: quote.Quote.Close})
+		hd = append(hd, USDQuote{TimeStamp: quote.TimeHigh.UTC(), Value: quote.Quote.High})
+		hd = append(hd, USDQuote{TimeStamp: quote.TimeLow.UTC(), Value: quote.Quote.Low})
 	}
 
 	sort.Sort(hd)

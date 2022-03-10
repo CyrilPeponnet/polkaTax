@@ -11,7 +11,7 @@ lint:
 		--enable=errcheck \
 		--enable=goimports \
 		--enable=ineffassign \
-		--enable=golint \
+		--enable=revive \
 		--enable=unused \
 		--enable=structcheck \
 		--enable=staticcheck \
